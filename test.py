@@ -1,3 +1,4 @@
+
 from pymongo import MongoClient 
 import numpy as np
 import smtplib,ssl  
@@ -9,19 +10,22 @@ from email.mime.text import MIMEText
 from email.utils import formatdate  
 from email import encoders  
 import os
+import RPi.GPIO as GPIO
 import cv2
 nombre=3
 camera = PiCamera()
 camera.start_preview()
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(18,GPIO.OUT)
 
 while nombre>0:
-   
+ GPIO.output(18,False)  
  camera.capture('/home/pi/yolov5-export-to-raspberry-pi/capture.jpg')     # image path set
  sleep(5)  
  camera.stop_preview() 
 
  
- os.system('python inf.py -w best-fp16.tflite -i /home/pi/yolov5-export-to-raspberry-pi/capture.jpg  --img_size 640');
+ os.system('python3.7 inf.py -w best-fp16.tflite -i /home/pi/yolov5-export-to-raspberry-pi/capture.jpg  --img_size 640');
 
 
  image=cv2.imread('/home/pi/yolov5-export-to-raspberry-pi/matricule.jpg')
@@ -73,8 +77,9 @@ while nombre>0:
  im2 = gray.copy()
  invd=255-dilation
  cv2.imwrite('matricule_pre.jpg',invd)
- os.system('tesseract  /home/pi/yolov5-export-to-raspberry-pi/matricule_pre.jpg  text  --dpi 300 --oem 3 --psm 6 nobatch ')
-
+ 
+ os.system('python3.7 cnn.py') 
+ 
  send_an_email()
  text_file = open("text.txt", "r")
 
@@ -94,3 +99,20 @@ while nombre>0:
     'text_extracted': data2,
  }
  records.insert_one(new_data)
+ col2=db.license_authorized
+ l = list(records.find({}, {'text_extracted': 1, '_id': 0}))
+ l2=list(col2.find({}, {'auth': 1, '_id': 0}))
+ tab:bool=[records.count_documents({})]
+ for item in l:
+      i=item.get("text_extracted")
+      for item2 in l2:
+          if item2.get("auth")==i:
+            tab.append(item2.get("auth"))
+ with open('lompe.txt') as f:
+    lines = f.readlines()
+ if (( data2 in tab) and(lines=="ON"))  :
+    GPIO.output(18,True)
+    sleep(5)
+ else:
+   print("noo")
+   os.system("rm lompe.txt")
